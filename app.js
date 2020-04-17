@@ -12,7 +12,7 @@ app.get('/test', (req, res) => res.send('Hello World!'))
 
 app.get('/scan', (req, res) => {
 
-  const files = fs.readdirSync('./movies')
+  const files = fs.readdirSync('./assets/movies')
     
   db.query('SELECT * FROM movies', (err, movies, fields) => {
     const toReturn = {
@@ -33,6 +33,13 @@ app.get('/scan', (req, res) => {
       }
     })
     res.json(toReturn)
+  })
+})
+
+app.get('/getVideoFile/:id', (req, res) => {
+  db.query(`SELECT filename FROM movies WHERE id = ${req.params.id}`, (err, results, fields) => {
+    const fileName = results[0].filename
+    res.sendFile(`${process.env.assets_dir}/movies/${fileName}`)
   })
 })
 
