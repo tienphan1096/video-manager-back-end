@@ -1,6 +1,6 @@
 CREATE TABLE movies (
     id INT NOT NULL AUTO_INCREMENT,
-    filename VARCHAR(255) NOT NULL,
-    name VARCHAR(255),
+    filename VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255) UNIQUE,
     PRIMARY KEY(id)
 )
