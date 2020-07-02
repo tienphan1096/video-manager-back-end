@@ -18,11 +18,26 @@ app.use(bodyParser.urlencoded({ extended: true }))
 
 app.use(cors())
 
+app.use(express.static('public'))
+
 app.get('/test', (req, res) => res.send('Hello World!'))
+
+app.get('/movies', (req, res) => {
+  db.query('SELECT * FROM movies', (err, movies, fields) => {
+    let toReturn = movies.map(movie => {
+      return {
+        filename: movie.filename,
+        name: movie.name,
+        thumbnail: `/assets/thumbnails/movies/${movie.id}.png`
+      }
+    })
+    res.json(toReturn)
+  })
+})
 
 app.get('/scan', (req, res) => {
 
-  const files = fs.readdirSync('./assets/movies')
+  const files = readdirSyncIgnoreHiddenFiles('./public/assets/movies')
     
   db.query('SELECT * FROM movies', (err, movies, fields) => {
     const toReturn = {
@@ -32,7 +47,10 @@ app.get('/scan', (req, res) => {
     files.forEach(fileName => {
       let match = movies.find(movie => movie.filename === fileName)
       if (!match) {
-        toReturn.newFiles.push(fileName)
+        toReturn.newFiles.push({
+          fileName,
+          thumbnail: `/assets/thumbnails/temp/${getFileNameWithoutExtension(fileName)}.png`
+        })
       }
     });
 
@@ -42,6 +60,9 @@ app.get('/scan', (req, res) => {
         toReturn.missing.push(movie)
       }
     })
+
+    generateTempThumbnails(toReturn.newFiles)
+
     res.json(toReturn)
   })
 })
@@ -53,7 +74,13 @@ app.get('/getVideoFile/:id', (req, res) => {
   })
 })
 
-app.post('/addMovie', (req, res, next) => {
+app.get('/actors', (req, res) => {
+  db.query(`SELECT * FROM actors`, (err, results, fields) => {
+    res.json(results)
+  })
+})
+
+app.post('/movie', (req, res, next) => {
   db.beginTransaction(async (err) => {
     try {
       let movieId = await insertMovieToDB(req.body.fileName, req.body.name)
@@ -63,10 +90,16 @@ app.post('/addMovie', (req, res, next) => {
         await insertMovieCast(movieId, req.body.actors)
       }
       
-      generateThumbnail(movieId, req.body.fileName)
+      generateThumbnail(`public/assets/movies/${req.body.fileName}`, 'public/assets/thumbnails/movies', movieId)
   
       res.json({
         result: 'success'
+      })
+
+      db.commit((err) => {
+        if (err) {
+          throw err
+        }
       })
     } catch(err) {
       db.rollback()
@@ -75,7 +108,7 @@ app.post('/addMovie', (req, res, next) => {
   })
 })
 
-app.post('/addActor', (req, res, next) => {
+app.post('/actor', (req, res, next) => {
   db.query(`INSERT INTO actors(name) VALUES('${req.body.actorName}')`, (err, result) => {
     try {
       if (err) {
@@ -98,6 +131,10 @@ app.post('/addActor', (req, res, next) => {
               result: 'success'
             })
           }
+        })
+      } else {
+        res.json({
+          result: 'success'
         })
       }
     } catch(e) {
@@ -149,16 +186,40 @@ function insertMovieCast(movieId, actors) {
   })
 }
 
-function generateThumbnail(movieId, fileName) {
+function generateThumbnail(moviePath, thumbnailFolder, thumbnailFileName) {
   let timemark = generateRandomNumber(0, 100)
-  ffmpeg(`assets/movies/${fileName}`)
+  ffmpeg(moviePath)
     .screenshots({
       timestamps: [timemark],
-      filename: `${movieId}.png`,
-      folder: 'assets/thumbnails'
+      filename: `${thumbnailFileName}.png`,
+      folder: thumbnailFolder
     })
 }
 
 function generateRandomNumber(min, max) {
   return min + ((max-min) * Math.random())
+}
+
+function generateTempThumbnails(videos) {
+  let existingThumbnails = readdirSyncIgnoreHiddenFiles('./public/assets/thumbnails/temp')
+  existingThumbnails = existingThumbnails.map(name => getFileNameWithoutExtension(name))
+  videos.forEach(video => {
+    let videoFileNameWithoutExtension = getFileNameWithoutExtension(video.fileName)
+    if (!existingThumbnails.includes(videoFileNameWithoutExtension)) {
+      generateThumbnail(
+        `public/assets/movies/${video.fileName}`,
+        'public/assets/thumbnails/temp',
+        videoFileNameWithoutExtension
+      )
+    }
+  })
+}
+
+function getFileNameWithoutExtension(name) {
+  return name.slice(0, name.lastIndexOf('.'))
+}
+
+function readdirSyncIgnoreHiddenFiles(folder) {
+  let toReturn = fs.readdirSync(folder)
+  return toReturn.filter(item => !(/(^|\/)\.[^\/\.]/g).test(item))
 }

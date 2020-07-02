@@ -1,5 +1,4 @@
 node_modules/
 package-lock.json
-assets/movies/*
-assets/thumbnails/*
+public/assets/*
 .env
