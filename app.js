@@ -30,7 +30,7 @@ app.get('/movies', (req, res) => {
         name: movie.name,
         thumbnail: `/assets/thumbnails/movies/${movie.id}.png`
       }
-    })
+    })  
     res.json(toReturn)
   })
 })
@@ -90,7 +90,7 @@ app.post('/movie', (req, res, next) => {
         await insertMovieCast(movieId, req.body.actors)
       }
       
-      generateThumbnail(`public/assets/movies/${req.body.fileName}`, 'public/assets/thumbnails/movies', movieId)
+      fs.renameSync(`public/assets/thumbnails/temp/${getFileNameWithoutExtension(req.body.fileName)}.png`, `public/assets/thumbnails/movies/${movieId}.png`)
   
       res.json({
         result: 'success'
